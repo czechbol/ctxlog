@@ -1,0 +1,46 @@
+[project]
+name = "slogx"
+version = "0.1.0"
+description = "Structured logging library for Python"
+authors = [{ name = "Your Name", email = "your.email@example.com" }]
+readme = "README.md"
+requires-python = ">=3.9,<4.0"
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[project.optional-dependencies]
+dev = [
+    "pytest (>=8.3.5,<9.0.0)",
+    "mypy (>=1.15.0,<2.0.0)",
+    "ruff (>=0.11.9,<0.12.0)",
+]
+docs = [
+    "sphinx (>=7.4.7,<8.0.0)",
+    "sphinx-autodoc-typehints (>=2.3.0,<3.0.0)",
+    "sphinx-rtd-theme (>=3.0.2,<4.0.0)",
+]
+
+[tool.mypy]
+python_version = "3.9"
+explicit_package_bases = true
+disallow_untyped_defs = true
+disallow_any_unimported = true
+no_implicit_optional = true
+check_untyped_defs = true
+warn_return_any = true
+show_error_codes = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+disable_error_code = ["import-untyped"]
+exclude = [".env", ".venv", "env", "venv", "build", "dist", "tests"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+exclude = [".env", ".venv", "env", "venv", "build", "dist"]
+
+[tool.ruff.lint]
+extend-select = ["I"]
