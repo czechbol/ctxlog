@@ -123,12 +123,16 @@ def test_console_handler_format_serialized():
     for key in expected_order:
         if key in keys:
             idx = keys.index(key)
-            assert idx > last_index, f"Key '{key}' is out of order in serialized log: {keys}"
+            assert idx > last_index, (
+                f"Key '{key}' is out of order in serialized log: {keys}"
+            )
             last_index = idx
     if "children" in keys:
         assert keys[-2] == "children" or keys[-1] == "children"
     if "exception" in keys:
-        assert keys[-1] == "exception" or ("children" in keys and keys[-2] == "exception")
+        assert keys[-1] == "exception" or (
+            "children" in keys and keys[-2] == "exception"
+        )
     assert data["timestamp"] == "2023-01-01T00:00:00Z"
     assert data["level"] == "info"
     assert data["event"] == "test_event"

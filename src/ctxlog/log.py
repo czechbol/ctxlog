@@ -33,7 +33,9 @@ class LogContext:
         # Only allow JSON-serializable types (by type, not by dump)
         for k, v in kwargs.items():
             if not self._is_json_serializable_type(v):
-                raise TypeError(f"Context field '{k}' with value '{v}' is not a JSON-serializable type.")
+                raise TypeError(
+                    f"Context field '{k}' with value '{v}' is not a JSON-serializable type."
+                )
         self._context.update(kwargs)
 
     def get_all(self) -> Dict[str, Any]:
