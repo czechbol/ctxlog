@@ -40,7 +40,15 @@ jobs:
         run: |
           TAG_NAME="${GITHUB_REF##*/}"
           VERSION="${TAG_NAME#v}"
-          sed -i "s/^version = \".*\"/version = \"$VERSION\"/" pyproject.toml
+          if [[ "${{ steps.semver_check.outputs.semver }}" == "true" ]]; then
+            sed -i "s/^version = \".*\"/version = \"$VERSION\"/" pyproject.toml
+          else
+            # For non-semver tags, use 0.1.0-dev-YYYYMMDD+<git-commit>
+            BASE_VERSION=$(grep '^version = ' pyproject.toml | sed 's/version = \"\(.*\)\"/\1/')
+            GIT_COMMIT=$(git rev-parse --short HEAD)
+            DATE=$(date +%Y%m%d)
+            sed -i "s/^version = \".*\"/version = \"$BASE_VERSION-dev-$DATE+$GIT_COMMIT\"/" pyproject.toml
+          fi
       - name: Build package
         run: poetry build
       - name: Publish to PyPI using Trusted Publisher
