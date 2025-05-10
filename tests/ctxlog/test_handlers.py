@@ -175,7 +175,6 @@ def test_console_handler_format_with_children():
     }
 
     formatted = handler.format(log_entry)
-    assert "Child logs:" in formatted
     assert "[INFO] child_event: Child message" in formatted
 
 

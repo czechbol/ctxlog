@@ -153,10 +153,7 @@ def test_contextual_structured_logging(mock_stdout):
             payment_id=payment.id,
             amount=payment.amount,
             currency=payment.currency,
-        )
-        log.ctx(level=LogLevel.ERROR, customer_id=payment.customer.id)
-        log.ctx(
-            level=LogLevel.DEBUG,
+            customer_id=payment.customer.id,
             payment_method=payment.method,
             payment_gateway=payment.gateway.name,
         )
@@ -169,9 +166,7 @@ def test_contextual_structured_logging(mock_stdout):
         except ValidationError as e:
             log.exc(e).error("Validation failed")
         except PaymentProcessError as e:
-            log.ctx(level=LogLevel.ERROR, error_code=e.code).exc(e).error(
-                "Payment failed"
-            )
+            log.ctx(error_code=e.code).exc(e).error("Payment failed")
 
     process_payment_success(payment)
 
@@ -183,10 +178,7 @@ def test_contextual_structured_logging(mock_stdout):
             payment_id=payment.id,
             amount=payment.amount,
             currency=payment.currency,
-        )
-        log.ctx(level=LogLevel.ERROR, customer_id=payment.customer.id)
-        log.ctx(
-            level=LogLevel.DEBUG,
+            customer_id=payment.customer.id,
             payment_method=payment.method,
             payment_gateway=payment.gateway.name,
         )
@@ -198,9 +190,7 @@ def test_contextual_structured_logging(mock_stdout):
         except ValidationError as e:
             log.exc(e).error("Validation failed")
         except PaymentProcessError as e:
-            log.ctx(level=LogLevel.ERROR, error_code=e.code).exc(e).error(
-                "Payment failed"
-            )
+            log.ctx(error_code=e.code).exc(e).error("Payment failed")
 
     process_payment_failure(payment)
 

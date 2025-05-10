@@ -45,14 +45,14 @@ logger = ctxlog.get_logger(__name__)
 logger.info("Hello, world!")
 
 # Structured logging
-logger.ctx(user_id="123", action="login").info("User logged in")
+logger.new().ctx(user_id="123", action="login").info("User logged in")
 
 # Exception logging
 try:
     # Some code that might raise an exception
     raise ValueError("Something went wrong")
 except Exception as e:
-    logger.exc(e).error("Operation failed")
+    logger.new().exc(e).error("Operation failed")
 ```
 
 ## Configuration
@@ -62,8 +62,8 @@ Global configuration is performed via `ctxlog.configure()` and should be called 
 ```python
 ctxlog.configure(
     level=ctxlog.LogLevel.INFO,
-    debug=False,  # Enable debug-level logs and include debug context fields
     timefmt="iso",  # ISO8601 timestamp format
+    utc=False,      # Use local time (set to True for UTC)
     handlers=[
         ctxlog.ConsoleHandler(serialize=False, color=True, use_stderr=False),
         ctxlog.FileHandler(
@@ -73,8 +73,8 @@ ctxlog.configure(
             rotation=ctxlog.FileRotation(
                 size="20MB",
                 time="00.00",
-                keep=12,
-                compress_old=True
+                keep=5,
+                compression="gzip"
             ),
         ),
     ]
@@ -90,16 +90,23 @@ def start_app():
     try:
         app.start()
     except Exception as e:
-        logger.exc(e).error("Failed to start app")
+        logger.new().exc(e).error("Failed to start app")
 ```
 
 ### Contextual Structured Logging
 
 ```python
 def process_payment(payment: Payment):
-    log = logger.ctx(event="new_payment", payment_id=payment.id, amount=payment.amount, currency=payment.currency)
-    log.error_ctx(customer_id=payment.customer.id)
-    log.debug_ctx(
+    log = logger.new()
+    log.event = "new_payment"
+    log.ctx(
+        payment_id=payment.id,
+        amount=payment.amount,
+        currency=payment.currency
+    )
+    log.ctx(level=LogLevel.ERROR, customer_id=payment.customer.id)
+    log.ctx(
+        level=LogLevel.DEBUG,
         payment_method=payment.method,
         payment_gateway=payment.gateway.name,
     )
@@ -112,28 +119,34 @@ def process_payment(payment: Payment):
     except ValidationError as e:
         log.exc(e).error("Validation failed")
     except PaymentProcessError as e:
-        log.error_ctx(error_code=e.code).exc(e).error("Payment failed")
+        log.ctx(level=LogLevel.ERROR, error_code=e.code).exc(e).error("Payment failed")
 ```
 
 ### Log Chaining
 
 ```python
-def process_order(order: Order):
-    log = logger.ctx(event="new_order", order_id=order.id)
-    log.error_ctx(customer_id=order.customer.id)
-    log.debug_ctx(
+def process_order(order):
+    log = logger.new()
+    log.event = "new_order"
+    log.ctx(order_id=order.id)
+    log.ctx(level=LogLevel.ERROR, customer_id=order.customer.id)
+    log.ctx(
+        level=LogLevel.DEBUG,
         order_items=[item.id for item in order.items],
         order_total=order.total,
     )
 
+    # Create a child log for validation
+    validation_log = log.new(event="order_validation")
+
     try:
-        validate_order(log.new(event="order_validation"), order)  # Use chained log for validation
+        validate_order(validation_log, order)
         # ... business logic ...
         log.info("Order processed successfully")
     except ValidationError as e:
         log.exc(e).error("Validation failed")
     except OrderProcessError as e:
-        log.error_ctx(error_code=e.code).exc(e).error("Order processing failed")
+        log.ctx(level=LogLevel.ERROR, error_code=e.code).exc(e).error("Order processing failed")
 ```
 
 ## Log Output Format
@@ -153,7 +166,8 @@ All logs are output as structured objects (dicts), optionally serialized as JSON
   "start_time": "2023-10-01T12:00:00Z",
   "payment_id": "pay_123",
   "amount": 100.0,
-  "currency": "USD"
+  "currency": "USD",
+  "transaction_id": "txn_456"
 }
 ```
 

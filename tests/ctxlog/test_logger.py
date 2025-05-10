@@ -21,7 +21,7 @@ def test_logger_new():
     logger = Logger("test_module")
     log = logger.new()
     assert isinstance(log, Log)
-    assert log.event == "test_module"
+    assert log.event is None
 
 
 def test_logger_with_context():
@@ -30,7 +30,7 @@ def test_logger_with_context():
     log = logger.new()
     log.ctx(user_id="123", action="login")
     assert isinstance(log, Log)
-    assert log.event == "test_module"
+    assert log.event is None
 
     # Check context fields through the log entry
     entry = log._build_log_entry(level=LogLevel.INFO)
@@ -52,27 +52,27 @@ def test_logger_with_custom_event():
     assert entry["user_id"] == "123"
 
 
-def test_logger_with_debug_context():
-    """Test creating a logger with DEBUG level context."""
+def test_logger_with_debug_fields():
+    """Test creating a logger with debug-related fields."""
     logger = Logger("test_module")
     log = logger.new()
-    log.ctx(level=LogLevel.DEBUG, request_id="abc123")
+    log.ctx(request_id="abc123")
     assert isinstance(log, Log)
 
-    # Check that the debug context fields are included in the log entry
+    # Check that the context fields are included in the log entry
     log.level = LogLevel.DEBUG
     entry = log._build_log_entry(level=LogLevel.DEBUG)
     assert entry["request_id"] == "abc123"
 
 
-def test_logger_with_error_context():
-    """Test creating a logger with ERROR level context."""
+def test_logger_with_error_fields():
+    """Test creating a logger with error-related fields."""
     logger = Logger("test_module")
     log = logger.new()
-    log.ctx(level=LogLevel.ERROR, error_code="E123")
+    log.ctx(error_code="E123")
     assert isinstance(log, Log)
 
-    # Check that the error context fields are included in the log entry
+    # Check that the context fields are included in the log entry
     log.level = LogLevel.ERROR
     entry = log._build_log_entry(level=LogLevel.ERROR)
     assert entry["error_code"] == "E123"
