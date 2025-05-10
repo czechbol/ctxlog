@@ -134,9 +134,20 @@ class Handler(ABC):
                     "event": log_entry.get("event", None),
                     "message": log_entry.get("message", ""),
                     "ctx_start": log_entry.get("ctx_start", None),
-                    **{key: value for key, value in log_entry.items() if key not in [
-                        "timestamp", "level", "event", "message", "ctx_start", "children", "exception"
-                    ]},
+                    **{
+                        key: value
+                        for key, value in log_entry.items()
+                        if key
+                        not in [
+                            "timestamp",
+                            "level",
+                            "event",
+                            "message",
+                            "ctx_start",
+                            "children",
+                            "exception",
+                        ]
+                    },
                     "children": log_entry.get("children", None),
                     "exception": log_entry.get("exception", None),
                 }.items()

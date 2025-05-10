@@ -277,10 +277,13 @@ def test_logcontext_add_valid_types():
     assert ctx.get_all()["a_bool"] is True
     assert ctx.get_all()["a_none"] is None
 
+
 def test_logcontext_add_invalid_types():
     ctx = LogContext()
+
     class NotSerializable:
         pass
+
     # Invalid: dict
     with pytest.raises(TypeError):
         ctx.add(bad_dict={"key": NotSerializable()})
