@@ -1,6 +1,6 @@
 [project]
 name = "ctxlog"
-version = "0.1.0"
+version = "0.0.4"
 description = "Structured logging library for Python"
 readme = "README.md"
 requires-python = ">=3.9,<4.0"
