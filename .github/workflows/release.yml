@@ -81,6 +81,7 @@ jobs:
           title: "Update changelog and version for ${{ github.ref_name }}"
           body: |
             Automated PR to update changelog and version for ${{ github.ref_name }}.
+          base: main
           branch: release-changelog-update
           add-paths: |
             pyproject.toml
