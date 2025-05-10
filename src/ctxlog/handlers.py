@@ -41,7 +41,7 @@ class FileRotation:
         self.keep = keep
         self.compression = compression
 
-    def should_rotate(self, file_path: Path) -> bool:
+    def _should_rotate(self, file_path: Path) -> bool:
         """Check if the file should be rotated.
 
         Args:
@@ -654,7 +654,7 @@ class FileHandler(Handler):
         # Use lock to prevent interleaved output from multiple threads
         with self._lock:
             # Check if we need to rotate the file
-            if self.rotation and self.rotation.should_rotate(self.file_path):
+            if self.rotation and self.rotation._should_rotate(self.file_path):
                 self._rotate_file()
 
             # Ensure we have a file handle

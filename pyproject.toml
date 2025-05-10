@@ -34,7 +34,8 @@ dev = [
 docs = [
     "sphinx (>=7.4.7,<8.0.0)",
     "sphinx-autodoc-typehints (>=2.3.0,<3.0.0)",
-    "sphinx-rtd-theme (>=3.0.2,<4.0.0)",
+    "furo (>=2024.8.6,<2025.0.0)",
+    "myst-parser (>=3.0.0,<4.0.0)",
 ]
 
 [tool.mypy]

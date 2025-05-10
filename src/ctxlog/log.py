@@ -84,7 +84,7 @@ class Log:
         """Add context fields to the log.
 
         Args:
-            **kwargs: Context fields to add.
+            **kwargs: Context fields to add. Must be JSON-serializable types.
 
         Returns:
             Self for method chaining.

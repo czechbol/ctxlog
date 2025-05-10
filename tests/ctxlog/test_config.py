@@ -1,5 +1,8 @@
 """Tests for the configuration module in __init__.py."""
 
+import os
+import tempfile
+
 import pytest
 
 import ctxlog
@@ -66,33 +69,35 @@ def test_configure_timefmt():
 def test_configure_handlers():
     """Test configure with different handlers."""
     # Test with no handlers (should use default)
-    ctxlog.configure(handlers=None)
-    assert len(ctxlog._global_config.handlers) == 1
-    assert isinstance(ctxlog._global_config.handlers[0], ConsoleHandler)
+    with tempfile.TemporaryDirectory() as temp_dir:
+        ctxlog.configure(handlers=None)
+        assert len(ctxlog._global_config.handlers) == 1
+        assert isinstance(ctxlog._global_config.handlers[0], ConsoleHandler)
 
-    # Test with custom handlers
-    console_handler = ConsoleHandler(serialize=True)
-    file_handler = FileHandler(file_path="test.log")
-    ctxlog.configure(handlers=[console_handler, file_handler])
+        # Test with custom handlers
+        console_handler = ConsoleHandler(serialize=True)
+        file_handler = FileHandler(file_path=os.path.join(temp_dir, "test.log"))
+        ctxlog.configure(handlers=[console_handler, file_handler])
 
-    assert len(ctxlog._global_config.handlers) == 2
-    assert ctxlog._global_config.handlers[0] is console_handler
-    assert ctxlog._global_config.handlers[1] is file_handler
+        assert len(ctxlog._global_config.handlers) == 2
+        assert ctxlog._global_config.handlers[0] is console_handler
+        assert ctxlog._global_config.handlers[1] is file_handler
 
 
 def test_configure_full():
     """Test configure with all parameters."""
-    console_handler = ConsoleHandler(serialize=True)
-    file_handler = FileHandler(file_path="test.log")
+    with tempfile.TemporaryDirectory() as temp_dir:
+        console_handler = ConsoleHandler(serialize=True)
+        file_handler = FileHandler(file_path=os.path.join(temp_dir, "test.log"))
 
-    ctxlog.configure(
-        level=LogLevel.WARNING,
-        timefmt="%Y-%m-%d",
-        handlers=[console_handler, file_handler],
-    )
+        ctxlog.configure(
+            level=LogLevel.WARNING,
+            timefmt="%Y-%m-%d",
+            handlers=[console_handler, file_handler],
+        )
 
-    assert ctxlog._global_config.level == LogLevel.WARNING
-    assert ctxlog._global_config.timefmt == "%Y-%m-%d"
-    assert len(ctxlog._global_config.handlers) == 2
-    assert ctxlog._global_config.handlers[0] is console_handler
-    assert ctxlog._global_config.handlers[1] is file_handler
+        assert ctxlog._global_config.level == LogLevel.WARNING
+        assert ctxlog._global_config.timefmt == "%Y-%m-%d"
+        assert len(ctxlog._global_config.handlers) == 2
+        assert ctxlog._global_config.handlers[0] is console_handler
+        assert ctxlog._global_config.handlers[1] is file_handler

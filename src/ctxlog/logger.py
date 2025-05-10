@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Union
 
 from .log import Log
 
@@ -24,6 +24,17 @@ class Logger:
             A new Log instance.
         """
         return Log(event=event)
+
+    def ctx(self, **kwargs: dict[str, Union[str, int, float, bool, None]]) -> Log:
+        """Create a new log context with additional fields. Use `.new().ctx()` instead if you want to set an event name.
+
+        Args:
+            **kwargs: Additional fields to include in the log context.
+
+        Returns:
+            A new Log instance with the provided context.
+        """
+        return self.new().ctx(**kwargs)
 
     def debug(self, message: str) -> None:
         """Log a debug message.
