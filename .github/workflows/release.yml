@@ -43,10 +43,10 @@ jobs:
           if [[ "${{ steps.semver_check.outputs.semver }}" == "true" ]]; then
             sed -i "s/^version = \".*\"/version = \"$VERSION\"/" pyproject.toml
           else
-            # For non-semver tags, use 0.1.0-dev-YYYYMMDD+<git-commit>
+            # For non-semver tags, use 0.1.0-devYYYYMMDDHHmm
             BASE_VERSION=$(grep '^version = ' pyproject.toml | sed 's/version = \"\(.*\)\"/\1/')
-            GIT_COMMIT=$(git rev-parse --short HEAD)
-            sed -i "s/^version = \".*\"/version = \"$BASE_VERSION-dev+$GIT_COMMIT\"/" pyproject.toml
+            DATE=$(date +%Y%m%d%H%M)
+            sed -i "s/^version = \".*\"/version = \"$BASE_VERSION-dev$DATE\"/" pyproject.toml
           fi
       - name: Build package
         run: poetry build
