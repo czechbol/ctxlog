@@ -30,7 +30,7 @@ def test_file_rotation_should_rotate_time_match(mock_datetime):
 
         # Test with time threshold that matches current time (12.30)
         rotation = FileRotation(time="12.30")
-        assert rotation.should_rotate(file_path) is True
+        assert rotation._should_rotate(file_path) is True
 
     # Clean up
     os.unlink(f.name)
@@ -48,7 +48,7 @@ def test_file_rotation_should_rotate_time_no_match(mock_datetime):
 
         # Test with time threshold that doesn't match current time
         rotation = FileRotation(time="00.00")
-        assert rotation.should_rotate(file_path) is False
+        assert rotation._should_rotate(file_path) is False
 
     # Clean up
     os.unlink(f.name)
@@ -79,8 +79,8 @@ def test_file_handler_with_time_rotation():
         assert os.path.exists(file_path)
 
         # Mock the should_rotate method to return True
-        original_should_rotate = rotation.should_rotate
-        rotation.should_rotate = lambda x: True
+        original_should_rotate = rotation._should_rotate
+        rotation._should_rotate = lambda x: True
 
         # Emit another log entry, which should trigger rotation
         handler.emit(log_entry)
@@ -91,7 +91,7 @@ def test_file_handler_with_time_rotation():
         assert os.path.exists(rotated_path)  # Rotated file should exist
 
         # Restore the original should_rotate method
-        rotation.should_rotate = original_should_rotate
+        rotation._should_rotate = original_should_rotate
 
         # Close the handler
         handler.close()

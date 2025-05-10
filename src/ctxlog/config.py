@@ -43,27 +43,27 @@ def configure(
         handlers: List of output handlers. If None, a default ConsoleHandler will be used.
 
     Example:
-        ```python
-        ctxlog.configure(
-            level=ctxlog.LogLevel.INFO,
-            timefmt="iso",
-            utx=True,
-            handlers=[
-                ctxlog.ConsoleHandler(serialize=False, color=True, use_stderr=False),
-                ctxlog.FileHandler(
-                    level=ctxlog.LogLevel.DEBUG,
-                    serialize=True,
-                    file_path="./app.log",
-                    rotation=ctxlog.FileRotation(
-                        size="20MB",
-                        time="00.00",
-                        keep=12,
-                        compress_old=True
+        Configure ctxlog at startup::
+
+            ctxlog.configure(
+                level=ctxlog.LogLevel.INFO,
+                timefmt="iso",
+                utc=True,
+                handlers=[
+                    ctxlog.ConsoleHandler(serialize=False, color=True, use_stderr=False),
+                    ctxlog.FileHandler(
+                        level=ctxlog.LogLevel.DEBUG,
+                        serialize=True,
+                        file_path="./app.log",
+                        rotation=ctxlog.FileRotation(
+                            size="20MB", # mutually exclusive with time
+                            time="00.00", # mutually exclusive with size
+                            keep=12,
+                            compress_old=True
+                        ),
                     ),
-                ),
-            ]
-        )
-        ```
+                ]
+            )
     """
     global _global_config
 

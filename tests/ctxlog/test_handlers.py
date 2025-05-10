@@ -232,23 +232,23 @@ def test_file_rotation_should_rotate_size():
 
         # Test with size threshold of 500 bytes (should rotate)
         rotation = FileRotation(size="500")
-        assert rotation.should_rotate(file_path) is True
+        assert rotation._should_rotate(file_path) is True
 
         # Test with size threshold of 2000 bytes (should not rotate)
         rotation = FileRotation(size="2000")
-        assert rotation.should_rotate(file_path) is False
+        assert rotation._should_rotate(file_path) is False
 
         # Test with KB units
         rotation = FileRotation(size="0.5KB")
-        assert rotation.should_rotate(file_path) is True
+        assert rotation._should_rotate(file_path) is True
 
         # Test with MB units - 0.001MB = 1048.576 bytes, which is > 1000 bytes
         rotation = FileRotation(size="0.001MB")
-        assert rotation.should_rotate(file_path) is False
+        assert rotation._should_rotate(file_path) is False
 
         # Test with GB units - 0.000001GB = 1073.741824 bytes, which is > 1000 bytes
         rotation = FileRotation(size="0.000001GB")
-        assert rotation.should_rotate(file_path) is False
+        assert rotation._should_rotate(file_path) is False
 
     # Clean up
     os.unlink(f.name)

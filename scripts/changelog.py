@@ -4,6 +4,21 @@ import sys
 from datetime import date
 
 
+def update_docs_version(version: str, conf_path: str = "docs/source/conf.py") -> None:
+    with open(conf_path, "r") as f:
+        content = f.read()
+
+    # Update the version in the conf.py file
+    version_pattern = r"^release\s*=\s*['\"]\d+\.\d+\.\d+['\"]"
+    new_version_line = f"release = '{version}'"
+    updated_content = re.sub(
+        version_pattern, new_version_line, content, flags=re.MULTILINE
+    )
+
+    with open(conf_path, "w") as f:
+        f.write(updated_content)
+
+
 def extract_changelog(version: str, changelog_path: str = "CHANGELOG.md") -> None:
     today = date.today().isoformat()
     with open(changelog_path, "r") as f:
@@ -48,4 +63,6 @@ if __name__ == "__main__":
     if version is None:
         print("Please provide a version as an argument or via stdin.", file=sys.stderr)
         sys.exit(1)
+
+    update_docs_version(version)
     extract_changelog(version)

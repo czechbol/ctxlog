@@ -75,6 +75,7 @@ jobs:
           base: main
           branch: release-changelog-update
           add-paths: |
+            docs/source/conf.py
             pyproject.toml
             CHANGELOG.md
       - name: Create Release
