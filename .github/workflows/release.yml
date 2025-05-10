@@ -92,6 +92,12 @@ jobs:
         run: |
           VERSION=${{ github.ref_name }}
           awk '/^## \['"$VERSION"'\]/ {flag=1; next} /^## \[/ && flag {flag=0} flag' CHANGELOG.md > release_body.txt
+      - name: Extract release notes
+        if: steps.semver_check.outputs.semver == 'true'
+        id: extract_release_notes
+        run: |
+          VERSION=${{ github.ref_name }}
+          ./scripts/changelog.py "$VERSION"
       - name: Create Release
         if: steps.semver_check.outputs.semver == 'true'
         uses: softprops/action-gh-release@v2

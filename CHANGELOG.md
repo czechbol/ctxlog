@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added a changelog parsing script for the release workflow.
+
 ### Fixed
 
 - Fixed release workflow to correctly populate the changelog body.
