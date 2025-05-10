@@ -1,0 +1,47 @@
+# GitHub Actions workflow for releasing to PyPI on semver tags
+name: Release
+on:
+  push:
+    tags:
+      - "*"
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+      - name: Check tag is valid semver
+        id: semver_check
+        run: |
+          TAG_NAME="${GITHUB_REF##*/}"
+          SEMVER_REGEX='^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$'
+          VERSION="${TAG_NAME#v}"
+          if [[ "$VERSION" =~ $SEMVER_REGEX ]]; then
+            echo "::set-output name=semver::true"
+          else
+            echo "::set-output name=semver::false"
+          fi
+      - name: Install dependencies
+        run: poetry install --no-interaction --only main
+      - name: Build package
+        run: poetry build
+      - name: Publish to PyPI using Trusted Publisher
+        if: steps.semver_check.outputs.semver == 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
+      - name: Publish to TestPyPI using Trusted Publisher
+        if: steps.semver_check.outputs.semver != 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
