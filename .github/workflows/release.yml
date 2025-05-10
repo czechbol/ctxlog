@@ -35,7 +35,7 @@ jobs:
             echo "semver=false" >> $GITHUB_OUTPUT
           fi
       - name: Install dependencies
-        run: poetry install --no-interaction --only main
+        run: poetry install --no-interaction -E docs
       - name: Update version in pyproject.toml
         run: |
           VERSION=${{ github.ref_name }}
@@ -63,7 +63,7 @@ jobs:
         id: extract_release_notes
         run: |
           VERSION=${{ github.ref_name }}
-          ./scripts/changelog.py "$VERSION"
+          ./scripts/release.py "$VERSION"
       - name: Create Pull Request for changelog and version update
         if: steps.semver_check.outputs.semver == 'true'
         uses: peter-evans/create-pull-request@v7
@@ -83,3 +83,22 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           body_path: release_body.txt
+      - name: Build Sphinx documentation
+        if: steps.semver_check.outputs.semver == 'true'
+        run: |
+          cd docs
+          poetry run make html
+          cd ..
+      - name: Upload documentation as artifact
+        if: steps.semver_check.outputs.semver == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: documentation
+          path: docs/build/html/
+          retention-days: 7
+      - name: Trigger ReadTheDocs build
+        if: steps.semver_check.outputs.semver == 'true'
+        uses: readthedocs/actions/preview@v1
+        with:
+          project-slug: "ctxlog"
+          webhook-url: ${{ secrets.READTHEDOCS_WEBHOOK_URL }}

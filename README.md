@@ -3,6 +3,7 @@
 [![PyPI version](https://img.shields.io/pypi/v/ctxlog.svg)](https://pypi.org/project/ctxlog/)
 [![Python versions](https://img.shields.io/pypi/pyversions/ctxlog.svg)](https://pypi.org/project/ctxlog/)
 [![License](https://img.shields.io/pypi/l/ctxlog.svg)](https://github.com/czechbol/ctxlog/blob/main/LICENSE)
+[![Documentation Status](https://readthedocs.org/projects/ctxlog/badge/?version=latest)](https://ctxlog.readthedocs.io/en/latest/?badge=latest)
 
 A structured logging library for Python that provides nested, context-rich logs.
 
@@ -13,6 +14,10 @@ This library was inspired by the [Canonical Log Lines](https://brandur.org/canon
 - **Structured Logging**: Structured logs with context fields with optional JSON serialization
 - **Context-Rich**: Extend the logs with additional context information over the course of an action
 - **Log Chaining**: Create nested log contexts for tracking complex operations
+
+## Documentation
+
+Full documentation is available at [ctxlog.readthedocs.io](https://ctxlog.readthedocs.io/).
 
 ## Installation
 
@@ -172,3 +177,19 @@ MIT License
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+### Documentation
+
+The documentation is built using Sphinx and hosted on ReadTheDocs. To build the documentation locally:
+
+```bash
+# Install development dependencies with documentation extras
+poetry install --with docs
+
+# Build the documentation
+cd docs
+poetry run make html
+cd ..
+```
+
+The built documentation will be available in the `docs/build/html` directory.
