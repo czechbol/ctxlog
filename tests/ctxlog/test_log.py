@@ -20,7 +20,7 @@ def test_log_init():
     assert log._has_parent is False
     assert log.children == []
     assert log.message is None
-    assert log.start_time is not None
+    assert log.ctx_start is not None
 
 
 def test_log_ctx():
@@ -41,7 +41,7 @@ def test_log_ctx():
 def test_log_ctx_with_multiple_fields():
     """Test Log.ctx() method with multiple fields."""
     log = Log(event="test_event")
-    result = log.ctx(request_id="abc123", payload={"key": "value"})
+    result = log.ctx(request_id="abc123", foo="bar")
 
     # Test method chaining
     assert result is log
@@ -50,7 +50,7 @@ def test_log_ctx_with_multiple_fields():
     log.level = LogLevel.INFO
     entry = log._build_log_entry(level=LogLevel.INFO)
     assert entry["request_id"] == "abc123"
-    assert entry["payload"] == {"key": "value"}
+    assert entry["foo"] == "bar"
 
 
 def test_log_ctx_with_error_fields():
@@ -264,6 +264,44 @@ def test_log_level_methods():
     log.critical("Critical message")
     assert mock_handler.logs[-1]["level"] == "critical"
     assert mock_handler.logs[-1]["message"] == "Critical message"
+
+
+def test_logcontext_add_valid_types():
+    ctx = LogContext()
+    # Valid types
+    ctx.add(a_str="foo", a_int=1, a_float=1.5, a_bool=True, a_none=None)
+    # Should not raise
+    assert ctx.get_all()["a_str"] == "foo"
+    assert ctx.get_all()["a_int"] == 1
+    assert ctx.get_all()["a_float"] == 1.5
+    assert ctx.get_all()["a_bool"] is True
+    assert ctx.get_all()["a_none"] is None
+
+def test_logcontext_add_invalid_types():
+    ctx = LogContext()
+    class NotSerializable:
+        pass
+    # Invalid: dict
+    with pytest.raises(TypeError):
+        ctx.add(bad_dict={"key": NotSerializable()})
+    # Invalid: list
+    with pytest.raises(TypeError):
+        ctx.add(bad_list=[1, NotSerializable()])
+    # Invalid: tuple
+    with pytest.raises(TypeError):
+        ctx.add(bad_tuple=(1, NotSerializable()))
+    # Invalid: set
+    with pytest.raises(TypeError):
+        ctx.add(bad_set={1, 2, 3})
+    # Invalid: object
+    with pytest.raises(TypeError):
+        ctx.add(bad_obj=NotSerializable())
+    # Invalid: dict with non-str key
+    with pytest.raises(TypeError):
+        ctx.add(bad_dict={1: "x"})
+    # Invalid: list with bad element
+    with pytest.raises(TypeError):
+        ctx.add(bad_list=[1, NotSerializable()])
 
 
 # Helper class for testing

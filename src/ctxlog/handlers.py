@@ -125,7 +125,24 @@ class Handler(ABC):
             The formatted log entry.
         """
         if self.serialize:
-            return json.dumps(log_entry)
+            # Ensure the serialized JSON follows the specified order and exclude empty fields
+            ordered_log_entry = {
+                key: value
+                for key, value in {
+                    "timestamp": log_entry.get("timestamp", ""),
+                    "level": log_entry.get("level", ""),  # Use original case
+                    "event": log_entry.get("event", None),
+                    "message": log_entry.get("message", ""),
+                    "ctx_start": log_entry.get("ctx_start", None),
+                    **{key: value for key, value in log_entry.items() if key not in [
+                        "timestamp", "level", "event", "message", "ctx_start", "children", "exception"
+                    ]},
+                    "children": log_entry.get("children", None),
+                    "exception": log_entry.get("exception", None),
+                }.items()
+                if value not in (None, "", [])
+            }
+            return json.dumps(ordered_log_entry)
 
         # Human-readable format
         timestamp = log_entry.get("timestamp", "")
@@ -149,7 +166,7 @@ class Handler(ABC):
                 "message",
                 "children",
                 "exception",
-                "start_time",
+                "ctx_start",
             ]:
                 context_fields.append(f"{key}={value}")
 
@@ -209,7 +226,7 @@ class Handler(ABC):
                 "message",
                 "children",
                 "exception",
-                "start_time",
+                "ctx_start",
             ]:
                 context_fields.append(f"{key}={value}")
 
