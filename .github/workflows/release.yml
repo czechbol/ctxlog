@@ -1,0 +1,84 @@
+# GitHub Actions workflow for releasing to PyPI on semver tags
+name: Release
+on:
+  push:
+    tags:
+      - "*"
+jobs:
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+      - name: Check tag is valid semver
+        id: semver_check
+        run: |
+          TAG=${{ github.ref_name }}
+          if [[ $GITHUB_REF =~ ^refs/tags/(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*|[0-9]*[a-zA-Z-][0-9a-zA-Z-]*)(\.(0|[1-9][0-9]*|[0-9]*[a-zA-Z-][0-9a-zA-Z-]*))*))?(\+([0-9a-zA-Z-]+(\.[0-9a-zA-Z-]+)*))?$ ]]; then
+            echo "semver=true" >> $GITHUB_OUTPUT
+          else
+            echo "semver=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Install dependencies
+        run: poetry install --no-interaction --only main
+      - name: Update version in pyproject.toml
+        run: |
+          VERSION=${{ github.ref_name }}
+          if [[ "${{ steps.semver_check.outputs.semver }}" == "true" ]]; then
+            sed -i "s/^version = \".*\"/version = \"$VERSION\"/" pyproject.toml
+          else
+            # For non-semver tags, use 0.1.0-devYYYYMMDDHHmm
+            BASE_VERSION=$(grep '^version = ' pyproject.toml | sed 's/version = \"\(.*\)\"/\1/')
+            DATE=$(date +%Y%m%d%H%M)
+            sed -i "s/^version = \".*\"/version = \"$BASE_VERSION-dev$DATE\"/" pyproject.toml
+          fi
+      - name: Build package
+        run: poetry build
+      - name: Publish to PyPI using Trusted Publisher
+        if: steps.semver_check.outputs.semver == 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
+      - name: Publish to TestPyPI using Trusted Publisher
+        if: steps.semver_check.outputs.semver != 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          verbose: true
+          repository-url: https://test.pypi.org/legacy/
+      - name: Generate Release Notes and update changelog
+        if: steps.semver_check.outputs.semver == 'true'
+        id: extract_release_notes
+        run: |
+          VERSION=${{ github.ref_name }}
+          ./scripts/changelog.py "$VERSION"
+      - name: Create Pull Request for changelog and version update
+        if: steps.semver_check.outputs.semver == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: "Update changelog and version for ${{ github.ref_name }}"
+          title: "Update changelog and version for ${{ github.ref_name }}"
+          body: |
+            Automated PR to update changelog and version for ${{ github.ref_name }}.
+          base: main
+          branch: release-changelog-update
+          add-paths: |
+            pyproject.toml
+            CHANGELOG.md
+      - name: Create Release
+        if: steps.semver_check.outputs.semver == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: release_body.txt
