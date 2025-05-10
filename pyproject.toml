@@ -1,7 +1,7 @@
 [project]
 name = "ctxlog"
 version = "1.0.0"
-description = "Structured logging library for Python"
+description = "A structured logging library for Python that provides nested, context-rich logs."
 readme = "README.md"
 requires-python = ">=3.9,<4.0"
 classifiers = [
@@ -18,6 +18,15 @@ classifiers = [
 ]
 keywords = ["logging", "structured-logging", "json-logging", "context-logging"]
 dependencies = []
+
+[project.urls]
+Repository = "https://github.com/czechbol/ctxlog"
+Documentation = "https://ctxlog.readthedocs.io/en/latest/"
+Issues = "https://github.com/czechbol/ctxlog/issues"
+Changelog = "https://github.com/czechbol/ctxlog/blob/main/CHANGELOG.md"
+PyPI = "https://pypi.org/project/ctxlog/"
+TestPyPI = "https://test.pypi.org/project/ctxlog/"
+"GitHub Releases" = "https://github.com/czechbol/ctxlog/releases"
 
 
 [build-system]
