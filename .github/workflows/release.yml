@@ -6,6 +6,7 @@ on:
       - "*"
 jobs:
   release:
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
@@ -45,3 +46,37 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
+      - name: Check for unreleased changes in CHANGELOG.md
+        if: steps.semver_check.outputs.semver == 'true'
+        id: changelog_check
+        run: |
+          TAG_NAME="${GITHUB_REF##*/}"
+          VERSION="${TAG_NAME#v}"
+          if grep -q "^## \[Unreleased\]" CHANGELOG.md; then
+            # Move Unreleased section to new version
+            awk -v ver="$VERSION" -v date="$(date +%Y-%m-%d)" '
+              BEGIN { unreleased=0 }
+              /^## \[Unreleased\]/ { print "## [" ver "] - " date; unreleased=1; next }
+              /^## \[/ && unreleased { unreleased=0 }
+              { print }
+            ' CHANGELOG.md > CHANGELOG.md.new && mv CHANGELOG.md.new CHANGELOG.md
+            git config user.name "github-actions"
+            git config user.email "github-actions@github.com"
+            git checkout main
+            git pull origin main
+            git add CHANGELOG.md
+            git commit -m "chore: update changelog for $VERSION"
+            git push origin main
+          fi
+      - name: Get release notes from changelog
+        if: steps.semver_check.outputs.semver == 'true'
+        id: changelog_body
+        run: |
+          TAG_NAME="${GITHUB_REF##*/}"
+          VERSION="${TAG_NAME#v}"
+          awk -v ver="$VERSION" '/^## \[" ver "\]/ {flag=1; next} /^## \[/ && flag {flag=0} flag' CHANGELOG.md > release_body.txt
+      - name: Create Release
+        if: steps.semver_check.outputs.semver == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: release_body.txt
