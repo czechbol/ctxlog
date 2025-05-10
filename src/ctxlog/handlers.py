@@ -1,10 +1,13 @@
+import gzip
 import json
 import os
 import sys
+import threading
+import zipfile
 from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TextIO, Union
+from typing import IO, Any, Dict, Literal, Optional
 
 from .level import LogLevel
 
@@ -17,7 +20,7 @@ class FileRotation:
         size: Optional[str] = None,
         time: Optional[str] = None,
         keep: int = 5,
-        compress_old: bool = False,
+        compression: Optional[Literal["gzip", "zip"]] = None,
     ) -> None:
         """Initialize a FileRotation configuration.
 
@@ -25,7 +28,7 @@ class FileRotation:
             size: Size threshold for rotation (e.g., "20MB"). Mutually exclusive with time.
             time: Time of day for rotation (e.g., "00.00"). Mutually exclusive with size.
             keep: Number of rotated files to keep.
-            compress_old: Whether to compress rotated logs.
+            compression: Compression method for old files (e.g., "gzip", "zip").
 
         Raises:
             ValueError: If both size and time are specified.
@@ -36,7 +39,7 @@ class FileRotation:
         self.size = size
         self.time = time
         self.keep = keep
-        self.compress_old = compress_old
+        self.compression = compression
 
     def should_rotate(self, file_path: Path) -> bool:
         """Check if the file should be rotated.
@@ -53,14 +56,24 @@ class FileRotation:
         if self.size is not None:
             # Parse size string (e.g., "20MB")
             size_str = self.size.lower()
+
+            # Get the file size
+            file_size = file_path.stat().st_size
+
+            # Calculate max_bytes based on the size string
             if size_str.endswith("kb"):
-                max_bytes = int(size_str[:-2]) * 1024
+                max_bytes = float(size_str[:-2]) * 1024
             elif size_str.endswith("mb"):
-                max_bytes = int(size_str[:-2]) * 1024 * 1024
+                max_bytes = float(size_str[:-2]) * 1024 * 1024
             elif size_str.endswith("gb"):
-                max_bytes = int(size_str[:-2]) * 1024 * 1024 * 1024
+                max_bytes = float(size_str[:-2]) * 1024 * 1024 * 1024
             else:
-                max_bytes = int(size_str)
+                max_bytes = float(size_str)
+
+            # Convert to integer for comparison
+            max_bytes = int(max_bytes)
+
+            return file_size >= max_bytes
 
             return file_path.stat().st_size >= max_bytes
 
@@ -89,6 +102,7 @@ class Handler(ABC):
         """
         self.level = level
         self.serialize = serialize
+        self._lock = threading.Lock()  # Lock for thread safety
 
     @abstractmethod
     def emit(self, log_entry: Dict[str, Any]) -> None:
@@ -97,6 +111,10 @@ class Handler(ABC):
         Args:
             log_entry: The log entry to emit.
         """
+        pass
+
+    def close(self) -> None:
+        """Close any resources used by the handler."""
         pass
 
     def format(self, log_entry: Dict[str, Any]) -> str:
@@ -123,7 +141,15 @@ class Handler(ABC):
         # Add context fields
         context_fields = []
         for key, value in log_entry.items():
-            if key not in ["timestamp", "level", "event", "message", "children", "exception", "start_time"]:
+            if key not in [
+                "timestamp",
+                "level",
+                "event",
+                "message",
+                "children",
+                "exception",
+                "start_time",
+            ]:
                 context_fields.append(f"{key}={value}")
 
         if context_fields:
@@ -168,7 +194,8 @@ class ConsoleHandler(Handler):
         """
         super().__init__(level, serialize)
         self.color = color and not serialize  # Only use color if not serializing
-        self.stream = sys.stderr if use_stderr else sys.stdout
+        self.use_stderr = use_stderr
+        # We don't need to open stdout/stderr as they're already open file objects
 
     def emit(self, log_entry: Dict[str, Any]) -> None:
         """Emit a log entry to the console.
@@ -192,7 +219,18 @@ class ConsoleHandler(Handler):
             elif level == "critical":
                 formatted = f"\033[31;1m{formatted}\033[0m"  # Bold Red
 
-        print(formatted, file=self.stream)
+        # Use lock to prevent interleaved output from multiple threads
+        with self._lock:
+            if self.use_stderr and log_entry.get("level", "").lower() in [
+                "warning",
+                "error",
+                "critical",
+            ]:
+                sys.stderr.write(formatted + "\n")
+                sys.stderr.flush()  # Ensure immediate output
+            else:
+                sys.stdout.write(formatted + "\n")
+                sys.stdout.flush()  # Ensure immediate output
 
 
 class FileHandler(Handler):
@@ -220,25 +258,86 @@ class FileHandler(Handler):
         # Create directory if it doesn't exist
         self.file_path.parent.mkdir(parents=True, exist_ok=True)
 
+        # Open the file and keep it open
+        self._file: Optional[IO] = None
+        self._open_file()
+
+    def _open_file(self) -> None:
+        """Open the log file."""
+        try:
+            if self._file is not None:
+                self._file.close()
+
+            # Line buffering (buffering=1) ensures writes are flushed on newlines
+            self._file = open(self.file_path, "a", encoding="utf-8", buffering=1)
+        except Exception:
+            # If we can't open the file, set _file to None
+            self._file = None
+            # We could log this error, but that might cause recursion
+            # Instead, we'll silently fail and try again on next emit
+
     def emit(self, log_entry: Dict[str, Any]) -> None:
         """Emit a log entry to the file.
 
         Args:
             log_entry: The log entry to emit.
         """
-        # Check if we need to rotate the file
-        if self.rotation and self.rotation.should_rotate(self.file_path):
-            self._rotate_file()
+        formatted = self.format(log_entry)
 
-        # Write to file
-        with open(self.file_path, "a", encoding="utf-8") as f:
-            formatted = self.format(log_entry)
-            f.write(formatted + "\n")
+        # Use lock to prevent interleaved output from multiple threads
+        with self._lock:
+            # Check if we need to rotate the file
+            if self.rotation and self.rotation.should_rotate(self.file_path):
+                self._rotate_file()
+
+            # Ensure we have a file handle
+            if self._file is None:
+                self._open_file()
+
+            # Write to file
+            try:
+                if self._file is not None:
+                    self._file.write(formatted + "\n")
+                    self._file.flush()  # Ensure data is written to disk
+                else:
+                    # Fallback to one-time open if we couldn't maintain the file handle
+                    with open(self.file_path, "a", encoding="utf-8") as f:
+                        f.write(formatted + "\n")
+            except Exception:
+                # If writing fails, try reopening the file
+                self._open_file()
+                if self._file is not None:
+                    try:
+                        self._file.write(formatted + "\n")
+                        self._file.flush()
+                    except Exception:
+                        # Last resort: fall back to one-time open
+                        try:
+                            with open(self.file_path, "a", encoding="utf-8") as f:
+                                f.write(formatted + "\n")
+                        except Exception:
+                            pass  # Silently fail if all attempts fail
+
+    def close(self) -> None:
+        """Close the file handle."""
+        with self._lock:
+            if self._file is not None:
+                try:
+                    self._file.close()
+                except Exception:
+                    pass
+                finally:
+                    self._file = None
 
     def _rotate_file(self) -> None:
         """Rotate the log file."""
-        if not self.file_path.exists():
+        if not self.file_path.exists() or self.rotation is None:
             return
+
+        # Close the current file handle
+        if self._file is not None:
+            self._file.close()
+            self._file = None
 
         # Get the base path and extension
         base_path = self.file_path.with_suffix("")
@@ -247,7 +346,7 @@ class FileHandler(Handler):
         # Shift existing rotated files
         for i in range(self.rotation.keep - 1, 0, -1):
             old_path = f"{base_path}.{i}{suffix}"
-            new_path = f"{base_path}.{i+1}{suffix}"
+            new_path = f"{base_path}.{i + 1}{suffix}"
 
             if os.path.exists(old_path):
                 if os.path.exists(new_path):
@@ -261,9 +360,21 @@ class FileHandler(Handler):
         os.rename(self.file_path, rotated_path)
 
         # Compress if needed
-        if self.rotation.compress_old and os.path.exists(rotated_path):
-            import gzip
-            with open(rotated_path, "rb") as f_in:
-                with gzip.open(f"{rotated_path}.gz", "wb") as f_out:
-                    f_out.write(f_in.read())
+        if self.rotation.compression and os.path.exists(rotated_path):
+            if self.rotation.compression == "zip":
+                with zipfile.ZipFile(f"{rotated_path}.zip", "w") as zipf:
+                    zipf.write(rotated_path, arcname=os.path.basename(rotated_path))
+            elif self.rotation.compression == "gzip":
+                # Gzip compression
+                with open(rotated_path, "rb") as f_in:
+                    with gzip.open(f"{rotated_path}.gz", "wb") as f_out:
+                        f_out.write(f_in.read())
+
             os.remove(rotated_path)
+
+        # Reopen the file
+        self._open_file()
+
+    def __del__(self) -> None:
+        """Destructor to ensure file is closed when handler is garbage collected."""
+        self.close()

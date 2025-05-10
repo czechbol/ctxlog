@@ -1,10 +1,54 @@
-import datetime
 import traceback
-from typing import Any, Dict, List, Optional, Type, TypeVar, Union, cast
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
 
 from .level import LogLevel
 
-T = TypeVar("T", bound="Log")
+
+class LogContext:
+    """A class to store context fields categorized by log level."""
+
+    def __init__(self) -> None:
+        """Initialize an empty LogContext."""
+        from .config import _global_config
+
+        self.config = _global_config
+        self._contexts: Dict[LogLevel, Dict[str, Any]] = {
+            level: {} for level in LogLevel
+        }
+
+    def add(self, level: LogLevel, **kwargs: Any) -> None:
+        """Add context fields at the specified log level.
+
+        Args:
+            level: The log level for these context fields.
+            **kwargs: Context fields to add.
+        """
+        for key, value in kwargs.items():
+            if isinstance(value, datetime):
+                # Convert datetime to string
+                if self.config.utc and value.tzinfo is not None:
+                    value = value.astimezone(timezone.utc)
+                kwargs[key] = _format_date(value, self.config.timefmt)
+        self._contexts[level].update(kwargs)
+
+    def get_for_level(self, level: LogLevel) -> Dict[str, Any]:
+        """Get all context fields that should be included for a given log level.
+
+        Args:
+            level: The log level to get context for.
+
+        Returns:
+            A dictionary of context fields.
+        """
+        result: Dict[str, Any] = {}
+
+        # Include context from all levels up to and including the specified level
+        for ctx_level in LogLevel:
+            if ctx_level.value <= level.value:
+                result.update(self._contexts[ctx_level])
+
+        return result
 
 
 class Log:
@@ -12,36 +56,36 @@ class Log:
 
     def __init__(
         self,
-        level: LogLevel = LogLevel.INFO,
         event: Optional[str] = None,
-        parent: Optional["Log"] = None,
-        **kwargs: Any,
+        has_parent: bool = False,
     ) -> None:
         """Initialize a Log context.
 
         Args:
             level: The log level.
             event: The event name.
-            parent: The parent log context, if this is a chained log.
+            has_parent: Whether this log context has a parent.
             **kwargs: Additional context fields.
         """
-        self.level = level
+        from .config import _global_config
+
+        self.config = _global_config
+        self.level: Optional[LogLevel] = None
         self.event = event
-        self.parent = parent
-        self.context: Dict[str, Any] = kwargs.copy()
-        self.debug_context: Dict[str, Any] = {}
-        self.error_context: Dict[str, Any] = {}
+        self._has_parent = has_parent
+        if self.config.utc:
+            self.start_time = _format_date(
+                datetime.now(timezone.utc), self.config.timefmt
+            )
+        else:
+            self.start_time = _format_date(datetime.now(), self.config.timefmt)
+        self.message: Optional[str] = None
+        self._context = LogContext()
         self.exception_info: Optional[Dict[str, Any]] = None
         self.children: List["Log"] = []
-        self.message: Optional[str] = None
-        self.start_time = datetime.datetime.now().isoformat()
-
-        # If this is a chained log, add it to the parent's children
-        if parent is not None:
-            parent.children.append(self)
 
     def ctx(self, level: LogLevel = LogLevel.INFO, **kwargs: Any) -> "Log":
-        """Add context fields to the log.
+        """Add context fields to the log at the specified level.
 
         Args:
             level: The log level for these context fields.
@@ -50,35 +94,7 @@ class Log:
         Returns:
             Self for method chaining.
         """
-        self.context.update(kwargs)
-        return self
-
-    def debug_ctx(self, **kwargs: Any) -> "Log":
-        """Add debug-level context fields to the log.
-
-        These fields will only be included in the output if debug logging is enabled.
-
-        Args:
-            **kwargs: Debug context fields to add.
-
-        Returns:
-            Self for method chaining.
-        """
-        self.debug_context.update(kwargs)
-        return self
-
-    def error_ctx(self, **kwargs: Any) -> "Log":
-        """Add error-level context fields to the log.
-
-        These fields will only be included in the output if the log level is error or higher.
-
-        Args:
-            **kwargs: Error context fields to add.
-
-        Returns:
-            Self for method chaining.
-        """
-        self.error_context.update(kwargs)
+        self._context.add(level, **kwargs)
         return self
 
     def exc(self, exception: Exception) -> "Log":
@@ -90,13 +106,24 @@ class Log:
         Returns:
             Self for method chaining.
         """
+        # Create exception info dictionary
         self.exception_info = {
             "type": exception.__class__.__name__,
             "value": str(exception),
-            "traceback": "".join(traceback.format_exception(
-                type(exception), exception, exception.__traceback__
-            )),
         }
+
+        # Add traceback if available
+        if exception.__traceback__ is not None:
+            self.exception_info["traceback"] = "".join(
+                traceback.format_exception(
+                    type(exception), exception, exception.__traceback__
+                )
+            )
+        else:
+            # If no traceback is available, create a simple one
+            self.exception_info["traceback"] = (
+                f"Traceback (most recent call last):\n{exception.__class__.__name__}: {str(exception)}\n"
+            )
         return self
 
     def new(self, event: Optional[str] = None, **kwargs: Any) -> "Log":
@@ -109,22 +136,27 @@ class Log:
         Returns:
             A new Log instance chained to this one.
         """
-        return Log(level=self.level, event=event, parent=self, **kwargs)
+        child_log = Log(event=event, has_parent=True)
+        self.children.append(child_log)
+        return child_log
 
-    def _build_log_entry(self, include_debug: bool = False) -> Dict[str, Any]:
+    def _build_log_entry(self, level: LogLevel) -> Dict[str, Any]:
         """Build a log entry dictionary.
 
         Args:
-            include_debug: Whether to include debug context fields.
+            level: The log level for the entry.
 
         Returns:
             A dictionary representing the log entry.
         """
+
         # Start with basic fields
         entry: Dict[str, Any] = {
             "level": str(self.level),
             "start_time": self.start_time,
         }
+
+        level = self.level if self.level else LogLevel.INFO
 
         # Add event if present
         if self.event:
@@ -134,16 +166,8 @@ class Log:
         if self.message:
             entry["message"] = self.message
 
-        # Add context fields
-        entry.update(self.context)
-
-        # Add debug context if requested
-        if include_debug:
-            entry.update(self.debug_context)
-
-        # Add error context if this is an error or higher
-        if self.level.value >= LogLevel.ERROR.value:
-            entry.update(self.error_context)
+        # Add context fields appropriate for this log level
+        entry.update(self._context.get_for_level(level=level))
 
         # Add exception info if present
         if self.exception_info:
@@ -152,8 +176,7 @@ class Log:
         # Add children if present
         if self.children:
             entry["children"] = [
-                child._build_log_entry(include_debug=include_debug)
-                for child in self.children
+                child._build_log_entry(level=level) for child in self.children
             ]
 
         return entry
@@ -172,21 +195,30 @@ class Log:
         self.level = level
 
         # If this is a chained log, don't emit
-        if self.parent is not None:
+        if self._has_parent:
             return
 
-        # Otherwise, build the log entry and emit it
-        from . import _global_config
-
-        # Add timestamp
-        entry = self._build_log_entry(include_debug=_global_config.debug)
-        entry["timestamp"] = datetime.datetime.now().isoformat()
-
         # Emit to all handlers
-        for handler in _global_config.handlers:
-            # Skip if the handler has a level and this log is below it
-            if handler.level is not None and level.value < handler.level.value:
+        for handler in self.config.handlers:
+            # get the handler level
+            lvl = handler.level
+            if lvl is None:
+                lvl = self.config.level
+
+            if self.level.value < lvl.value:
+                # Skip if log level is lower than handler level
+                # (e.g., skip DEBUG logs if handler level is INFO)
                 continue
+
+            entry = self._build_log_entry(level=lvl)
+
+            # Add timestamp
+            if self.config.utc:
+                entry["timestamp"] = _format_date(
+                    datetime.now(timezone.utc), self.config.timefmt
+                )
+            else:
+                entry["timestamp"] = _format_date(datetime.now(), self.config.timefmt)
 
             handler.emit(entry)
 
@@ -229,3 +261,20 @@ class Log:
             message: The log message.
         """
         self._emit(message, LogLevel.CRITICAL)
+
+
+def _format_date(date: datetime, timefmt: str) -> str:
+    """Format a datetime object to a string based on the provided format.
+
+    Args:
+        date: The datetime object to format.
+        timefmt: The format string. Use 'iso' for ISO8601, or provide a custom strftime format string.
+
+    Returns:
+        A formatted string representation of the date.
+    """
+
+    if timefmt == "iso":
+        return date.isoformat()
+    else:
+        return date.strftime(timefmt)
