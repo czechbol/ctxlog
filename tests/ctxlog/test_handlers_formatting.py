@@ -172,6 +172,29 @@ def test_handler_format_serialized_with_complex_data():
     # Parse the JSON to verify it's valid
     parsed = json.loads(formatted)
 
+    # Check that all fields are included and in the correct order
+    keys = list(parsed.keys())
+    # The first keys should be in the specified order if present
+    expected_order = [
+        "timestamp",
+        "level",
+        "event",
+        "message",
+        "ctx_start",
+    ]
+    # All expected_order keys that are present should be in the correct order
+    last_index = -1
+    for key in expected_order:
+        if key in keys:
+            idx = keys.index(key)
+            assert idx > last_index, f"Key '{key}' is out of order in serialized log: {keys}"
+            last_index = idx
+    # Children and exception should be last if present
+    if "children" in keys:
+        assert keys[-2] == "children" or keys[-1] == "children"
+    if "exception" in keys:
+        assert keys[-1] == "exception" or ("children" in keys and keys[-2] == "exception")
+
     # Check that all fields are included
     assert parsed["timestamp"] == "2023-01-01T00:00:00Z"
     assert parsed["level"] == "info"

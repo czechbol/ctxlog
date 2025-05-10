@@ -1,6 +1,6 @@
 import traceback
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from .level import LogLevel
 
@@ -15,18 +15,25 @@ class LogContext:
         self.config = _global_config
         self._context: Dict[str, Any] = {}
 
-    def add(self, **kwargs: Any) -> None:
+    def _is_json_serializable_type(self, value: Any) -> bool:
+        """Recursively check if value is a JSON-serializable type."""
+        if value is None:
+            return True
+        if isinstance(value, (str, int, float, bool)):
+            return True
+        return False
+
+    def add(self, **kwargs: dict[str, Union[str, int, float, bool, None]]) -> None:
         """Add context fields.
 
         Args:
             **kwargs: Context fields to add.
         """
-        for key, value in kwargs.items():
-            if isinstance(value, datetime):
-                # Convert datetime to string
-                if self.config.utc and value.tzinfo is not None:
-                    value = value.astimezone(timezone.utc)
-                kwargs[key] = _format_date(value, self.config.timefmt)
+
+        # Only allow JSON-serializable types (by type, not by dump)
+        for k, v in kwargs.items():
+            if not self._is_json_serializable_type(v):
+                raise TypeError(f"Context field '{k}' with value '{v}' is not a JSON-serializable type.")
         self._context.update(kwargs)
 
     def get_all(self) -> Dict[str, Any]:
@@ -61,17 +68,17 @@ class Log:
         self.event = event
         self._has_parent = has_parent
         if self.config.utc:
-            self.start_time = _format_date(
+            self.ctx_start = _format_date(
                 datetime.now(timezone.utc), self.config.timefmt
             )
         else:
-            self.start_time = _format_date(datetime.now(), self.config.timefmt)
+            self.ctx_start = _format_date(datetime.now(), self.config.timefmt)
         self.message: Optional[str] = None
         self._context = LogContext()
         self.exception_info: Optional[Dict[str, Any]] = None
         self.children: List["Log"] = []
 
-    def ctx(self, **kwargs: Any) -> "Log":
+    def ctx(self, **kwargs: dict[str, Union[str, int, float, bool, None]]) -> "Log":
         """Add context fields to the log.
 
         Args:
@@ -134,7 +141,7 @@ class Log:
         # Start with basic fields
         entry: Dict[str, Any] = {
             "level": str(self.level),
-            "start_time": self.start_time,
+            "ctx_start": self.ctx_start,
         }
 
         level = self.level if self.level else LogLevel.INFO
