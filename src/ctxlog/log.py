@@ -6,22 +6,19 @@ from .level import LogLevel
 
 
 class LogContext:
-    """A class to store context fields categorized by log level."""
+    """A class to store context fields."""
 
     def __init__(self) -> None:
         """Initialize an empty LogContext."""
         from .config import _global_config
 
         self.config = _global_config
-        self._contexts: Dict[LogLevel, Dict[str, Any]] = {
-            level: {} for level in LogLevel
-        }
+        self._context: Dict[str, Any] = {}
 
-    def add(self, level: LogLevel, **kwargs: Any) -> None:
-        """Add context fields at the specified log level.
+    def add(self, **kwargs: Any) -> None:
+        """Add context fields.
 
         Args:
-            level: The log level for these context fields.
             **kwargs: Context fields to add.
         """
         for key, value in kwargs.items():
@@ -30,25 +27,15 @@ class LogContext:
                 if self.config.utc and value.tzinfo is not None:
                     value = value.astimezone(timezone.utc)
                 kwargs[key] = _format_date(value, self.config.timefmt)
-        self._contexts[level].update(kwargs)
+        self._context.update(kwargs)
 
-    def get_for_level(self, level: LogLevel) -> Dict[str, Any]:
-        """Get all context fields that should be included for a given log level.
-
-        Args:
-            level: The log level to get context for.
+    def get_all(self) -> Dict[str, Any]:
+        """Get all context fields.
 
         Returns:
-            A dictionary of context fields.
+            A dictionary of all context fields.
         """
-        result: Dict[str, Any] = {}
-
-        # Include context from all levels up to and including the specified level
-        for ctx_level in LogLevel:
-            if ctx_level.value <= level.value:
-                result.update(self._contexts[ctx_level])
-
-        return result
+        return self._context.copy()
 
 
 class Log:
@@ -84,17 +71,16 @@ class Log:
         self.exception_info: Optional[Dict[str, Any]] = None
         self.children: List["Log"] = []
 
-    def ctx(self, level: LogLevel = LogLevel.INFO, **kwargs: Any) -> "Log":
-        """Add context fields to the log at the specified level.
+    def ctx(self, **kwargs: Any) -> "Log":
+        """Add context fields to the log.
 
         Args:
-            level: The log level for these context fields.
             **kwargs: Context fields to add.
 
         Returns:
             Self for method chaining.
         """
-        self._context.add(level, **kwargs)
+        self._context.add(**kwargs)
         return self
 
     def exc(self, exception: Exception) -> "Log":
@@ -118,11 +104,6 @@ class Log:
                 traceback.format_exception(
                     type(exception), exception, exception.__traceback__
                 )
-            )
-        else:
-            # If no traceback is available, create a simple one
-            self.exception_info["traceback"] = (
-                f"Traceback (most recent call last):\n{exception.__class__.__name__}: {str(exception)}\n"
             )
         return self
 
@@ -166,8 +147,8 @@ class Log:
         if self.message:
             entry["message"] = self.message
 
-        # Add context fields appropriate for this log level
-        entry.update(self._context.get_for_level(level=level))
+        # Add all context fields
+        entry.update(self._context.get_all())
 
         # Add exception info if present
         if self.exception_info:

@@ -38,33 +38,31 @@ def test_log_ctx():
     assert entry["action"] == "login"
 
 
-def test_log_debug_ctx():
-    """Test Log.ctx() method with DEBUG level."""
+def test_log_ctx_with_multiple_fields():
+    """Test Log.ctx() method with multiple fields."""
     log = Log(event="test_event")
-    result = log.ctx(
-        level=LogLevel.DEBUG, request_id="abc123", payload={"key": "value"}
-    )
+    result = log.ctx(request_id="abc123", payload={"key": "value"})
 
     # Test method chaining
     assert result is log
 
-    # Test debug context fields are included in the log entry
-    log.level = LogLevel.DEBUG
-    entry = log._build_log_entry(level=LogLevel.DEBUG)
+    # Test context fields are included in the log entry
+    log.level = LogLevel.INFO
+    entry = log._build_log_entry(level=LogLevel.INFO)
     assert entry["request_id"] == "abc123"
     assert entry["payload"] == {"key": "value"}
 
 
-def test_log_error_ctx():
-    """Test Log.ctx() method with ERROR level."""
+def test_log_ctx_with_error_fields():
+    """Test Log.ctx() method with error-related fields."""
     log = Log(event="test_event")
-    result = log.ctx(level=LogLevel.ERROR, error_code="E123", details="Invalid input")
+    result = log.ctx(error_code="E123", details="Invalid input")
 
     # Test method chaining
     assert result is log
 
     # Test error context fields are included in the log entry
-    log.level = LogLevel.ERROR  # Set log level to ERROR to include error fields
+    log.level = LogLevel.ERROR
     entry = log._build_log_entry(level=LogLevel.ERROR)
     assert entry["error_code"] == "E123"
     assert entry["details"] == "Invalid input"
@@ -83,6 +81,24 @@ def test_log_exc():
     assert log.exception_info is not None
     assert log.exception_info["type"] == "ValueError"
     assert log.exception_info["value"] == "Test error"
+    assert "traceback" not in log.exception_info
+
+
+def test_log_exc_with_traceback():
+    """Test Log.exc() method with traceback."""
+    log = Log(event="test_event")
+    try:
+        1 / 0
+    except ZeroDivisionError as e:
+        result = log.exc(e)
+
+    # Test method chaining
+    assert result is log
+
+    # Test exception info with traceback
+    assert log.exception_info is not None
+    assert log.exception_info["type"] == "ZeroDivisionError"
+    assert log.exception_info["value"] == "division by zero"
     assert "Traceback" in log.exception_info["traceback"]
 
 
@@ -109,29 +125,25 @@ def test_log_build_entry():
     """Test Log._build_log_entry method."""
     log = Log(event="test_event")
     log.level = LogLevel.INFO
-    log.ctx(user_id="123", action="login")
-    log.ctx(level=LogLevel.DEBUG, request_id="abc123")
-    log.ctx(level=LogLevel.ERROR, error_code="E123")
+    log.ctx(user_id="123", action="login", request_id="abc123", error_code="E123")
     log.message = "Test message"
 
-    # Build entry with INFO level
+    # Build entry with any level
     entry = log._build_log_entry(level=LogLevel.INFO)
     assert entry["level"] == "info"
     assert entry["event"] == "test_event"
     assert entry["message"] == "Test message"
     assert entry["user_id"] == "123"
     assert entry["action"] == "login"
-    assert "request_id" in entry  # Debug context is included (DEBUG < INFO)
-    assert "error_code" not in entry  # Error context is not included (ERROR > INFO)
+    assert entry["request_id"] == "abc123"
+    assert entry["error_code"] == "E123"
 
-    # Build entry with DEBUG level
+    # All context fields should be included regardless of level
     entry = log._build_log_entry(level=LogLevel.DEBUG)
-    assert entry["request_id"] == "abc123"  # Debug context included
-
-    # Test error level includes error context
-    log.level = LogLevel.ERROR
-    entry = log._build_log_entry(level=LogLevel.ERROR)
-    assert entry["error_code"] == "E123"  # Error context included
+    assert entry["user_id"] == "123"
+    assert entry["action"] == "login"
+    assert entry["request_id"] == "abc123"
+    assert entry["error_code"] == "E123"
 
 
 def test_log_build_entry_with_exception():

@@ -1,3 +1,5 @@
+from typing import Optional
+
 from .log import Log
 
 
@@ -15,13 +17,13 @@ class Logger:
         """
         self.name = name
 
-    def new(self) -> Log:
+    def new(self, event: Optional[str] = None) -> Log:
         """Create a new log context without any extra fields.
 
         Returns:
             A new Log instance.
         """
-        return Log(event=self.name)
+        return Log(event=event)
 
     def debug(self, message: str) -> None:
         """Log a debug message.
