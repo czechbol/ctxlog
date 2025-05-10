@@ -4,6 +4,8 @@
 [![Python versions](https://img.shields.io/pypi/pyversions/ctxlog.svg)](https://pypi.org/project/ctxlog/)
 [![License](https://img.shields.io/pypi/l/ctxlog.svg)](https://github.com/czechbol/ctxlog/blob/main/LICENSE)
 [![Documentation Status](https://readthedocs.org/projects/ctxlog/badge/?version=latest)](https://ctxlog.readthedocs.io/en/latest/?badge=latest)
+[![Tests](https://github.com/czechbol/ctxlog/actions/workflows/test.yml/badge.svg)](https://github.com/czechbol/ctxlog/actions/workflows/test.yml)
+[![Coverage](https://img.shields.io/codecov/c/github/czechbol/ctxlog)](https://codecov.io/gh/czechbol/ctxlog)
 
 A structured logging library for Python that provides nested, context-rich logs.
 
