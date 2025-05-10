@@ -64,8 +64,7 @@ jobs:
 
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          git pull origin main
-          git checkout main
+          git checkout -b release-changelog-update
           git add pyproject.toml
 
           if grep -q "^## \[Unreleased\]" CHANGELOG.md; then
@@ -80,7 +79,14 @@ jobs:
           fi
 
           git commit -m "Update files for version $VERSION" || echo "No changes to commit"
-          git push origin main
+          git push origin release-changelog-update
+      - name: Create Pull Request for changelog and version update
+        if: steps.semver_check.outputs.semver == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: release-changelog-update
+          title: "Update changelog and version for ${{ github.ref_name }}"
+          body: "Automated PR to update changelog and version for ${{ github.ref_name }}."
       - name: Get release notes from changelog
         if: steps.semver_check.outputs.semver == 'true'
         id: changelog_body
