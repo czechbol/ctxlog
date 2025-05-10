@@ -11,6 +11,8 @@ jobs:
     environment: pypi
     permissions:
       id-token: write
+      contents: write
+      pull-requests: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -62,31 +64,27 @@ jobs:
         run: |
           VERSION=${{ github.ref_name }}
 
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git checkout -b release-changelog-update
-          git add pyproject.toml
-
+          # Update files as needed
           if grep -q "^## \[Unreleased\]" CHANGELOG.md; then
-            # Move Unreleased section to new version
             awk -v ver="$VERSION" -v date="$(date +%Y-%m-%d)" '
               BEGIN { unreleased=0 }
               /^## \[Unreleased\]/ { print "## [" ver "] - " date; unreleased=1; next }
               /^## \[/ && unreleased { unreleased=0 }
               { print }
             ' CHANGELOG.md > CHANGELOG.md.new && mv CHANGELOG.md.new CHANGELOG.md
-            git add CHANGELOG.md
           fi
-
-          git commit -m "Update files for version $VERSION" || echo "No changes to commit"
-          git push origin release-changelog-update
       - name: Create Pull Request for changelog and version update
         if: steps.semver_check.outputs.semver == 'true'
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v7
         with:
-          branch: release-changelog-update
+          commit-message: "Update changelog and version for ${{ github.ref_name }}"
           title: "Update changelog and version for ${{ github.ref_name }}"
-          body: "Automated PR to update changelog and version for ${{ github.ref_name }}."
+          body: |
+            Automated PR to update changelog and version for ${{ github.ref_name }}.
+          branch: release-changelog-update
+          add-paths: |
+            pyproject.toml
+            CHANGELOG.md
       - name: Get release notes from changelog
         if: steps.semver_check.outputs.semver == 'true'
         id: changelog_body
