@@ -60,13 +60,12 @@ jobs:
         if: steps.semver_check.outputs.semver == 'true'
         id: changelog_check
         run: |
-          TAG_NAME="${GITHUB_REF##*/}"
-          VERSION="${TAG_NAME#v}"
+          VERSION=${{ github.ref_name }}
 
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          git checkout main
           git pull origin main
+          git checkout main
           git add pyproject.toml
 
           if grep -q "^## \[Unreleased\]" CHANGELOG.md; then
@@ -86,8 +85,7 @@ jobs:
         if: steps.semver_check.outputs.semver == 'true'
         id: changelog_body
         run: |
-          TAG_NAME="${GITHUB_REF##*/}"
-          VERSION="${TAG_NAME#v}"
+          VERSION=${{ github.ref_name }}
           awk -v ver="$VERSION" '/^## \[" ver "\]/ {flag=1; next} /^## \[/ && flag {flag=0} flag' CHANGELOG.md > release_body.txt
       - name: Create Release
         if: steps.semver_check.outputs.semver == 'true'
