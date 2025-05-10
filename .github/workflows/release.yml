@@ -58,21 +58,12 @@ jobs:
         with:
           verbose: true
           repository-url: https://test.pypi.org/legacy/
-      - name: Check for unreleased changes in CHANGELOG.md
+      - name: Generate Release Notes and update changelog
         if: steps.semver_check.outputs.semver == 'true'
-        id: changelog_check
+        id: extract_release_notes
         run: |
           VERSION=${{ github.ref_name }}
-
-          # Update files as needed
-          if grep -q "^## \[Unreleased\]" CHANGELOG.md; then
-            awk -v ver="$VERSION" -v date="$(date +%Y-%m-%d)" '
-              BEGIN { unreleased=0 }
-              /^## \[Unreleased\]/ { print "## [" ver "] - " date; unreleased=1; next }
-              /^## \[/ && unreleased { unreleased=0 }
-              { print }
-            ' CHANGELOG.md > CHANGELOG.md.new && mv CHANGELOG.md.new CHANGELOG.md
-          fi
+          ./scripts/changelog.py "$VERSION"
       - name: Create Pull Request for changelog and version update
         if: steps.semver_check.outputs.semver == 'true'
         uses: peter-evans/create-pull-request@v7
@@ -86,12 +77,6 @@ jobs:
           add-paths: |
             pyproject.toml
             CHANGELOG.md
-      - name: Get release notes from changelog
-        if: steps.semver_check.outputs.semver == 'true'
-        id: changelog_body
-        run: |
-          VERSION=${{ github.ref_name }}
-          awk '/^## \['"$VERSION"'\]/ {flag=1; next} /^## \[/ && flag {flag=0} flag' CHANGELOG.md > release_body.txt
       - name: Create Release
         if: steps.semver_check.outputs.semver == 'true'
         uses: softprops/action-gh-release@v2
